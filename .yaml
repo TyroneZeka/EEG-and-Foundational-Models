@@ -1,0 +1,245 @@
+project:
+  name: "EEG_Foundation_Model_Assessment"
+  deadline_days: 2
+  priority: "speed_and_compliance"
+  strict_rules:
+    - do_not_change_datasets_after_day1
+    - do_not_add_models
+    - log_everything_to_tensorboard
+    - explain_failures_do_not_hide_them
+
+global_config:
+  language: python
+  framework: pytorch
+  eeg_tools:
+    - mne
+    - moabb
+  logging: tensorboard
+  random_seed: 42
+
+datasets:
+  task1:
+    - name: "BCI_IV_2a"
+      moabb_id: "BNCI2014001"
+      task: "motor_imagery"
+      channels: 22
+      sampling_rate_hz: 250
+
+    - name: "BCI_IV_2b"
+      moabb_id: "BNCI2014004"
+      task: "motor_imagery"
+      channels: 3
+      sampling_rate_hz: 250
+
+    - name: "PhysioNet_MI"
+      mne_loader: "eegbci"
+      task: "motor_imagery"
+      channels: 64
+      sampling_rate_hz: 160
+
+  task2:
+    datasets:
+      - name: "BCI_IV_2a"
+        role: "fine_tuning_and_evaluation"
+
+      - name: "PhysioNet_MI"
+        role: "cross_dataset_generalization"
+
+
+preprocessing:
+  reference: "average"
+  bandpass_hz: [4, 38]
+  filter_type: "zero_phase"
+  epoching:
+    window_seconds: 2.0
+    overlap: 0.5
+  normalization:
+    type: "zscore"
+    scope: "per_subject"
+    fit_on: "training_only"
+
+models:
+  task1:
+    name: "EEGNet"
+    source: "canonical_implementation"
+    modifications: "none"
+  task2:
+    name: "BIOT"
+    source_repo: "https://github.com/ycq091044/BIOT"
+    training_modes:
+      - scratch
+      - pretrained_finetune
+
+metrics:
+  primary: "balanced_accuracy"
+  secondary:
+    - "loss"
+    - "per_class_accuracy"
+
+directory_structure:
+  root: "project_root"
+  subdirs:
+    - data/raw
+    - data/processed
+    - models
+    - experiments/task1_eegnet
+    - experiments/task2_biot
+    - analysis
+    - logs
+    - slides
+
+timeline:
+  iter1:
+    goal: "Data + EEGNet pipeline working end-to-end"
+    steps:
+      - id: D1_S1
+        name: "Download and verify datasets"
+        actions:
+          - download_BCI_IV_2a_via_MOABB
+          - download_PhysioNet_MI_via_MNE
+          - verify_channels_sampling_labels
+        outputs:
+          - dataset_summary.txt
+
+      - id: D1_S2
+        name: "Implement unified preprocessing"
+        actions:
+          - implement_preprocess_function
+          - apply_to_all_datasets
+          - cache_processed_tensors
+        outputs:
+          - data/processed/*.pt
+
+      - id: D1_S3
+        name: "Implement EEGNet"
+        actions:
+          - code_eegnet_exact_architecture
+          - validate_forward_pass
+        outputs:
+          - models/eegnet.py
+
+      - id: D1_S4
+        name: "Cross-subject training loop"
+        actions:
+          - implement_LOSO_split
+          - train_EEGNet
+          - log_tensorboard_metrics
+        outputs:
+          - logs/task1_eegnet/*
+
+  iter2:
+    goal: "Mandatory Task 1 analyses completed"
+    steps:
+      - id: D2_S1
+        name: "t-SNE analysis"
+        actions:
+          - extract_embeddings_raw_hidden_output
+          - run_tsne_fixed_seed
+          - generate_scatter_plots
+        constraints:
+          - same_perplexity_all_stages
+        outputs:
+          - analysis/tsne_plots.png
+
+      - id: D2_S2
+        name: "Gradient flow visualization"
+        actions:
+          - hook_backward_pass
+          - record_gradient_norms
+          - log_early_mid_late_training
+        outputs:
+          - logs/gradient_flow/*
+
+      - id: D2_S3
+        name: "Reproduce Figure 3"
+        actions:
+          - identify_reference_figure
+          - reproduce_axes_and_logic
+          - document_differences
+        outputs:
+          - analysis/figure3.png
+          - analysis/figure3_notes.txt
+
+  iter3:
+    goal: "BIOT experiments completed"
+    steps:
+      - id: D3_S1
+        name: "Setup BIOT"
+        actions:
+          - clone_official_repo
+          - verify_pretrained_weights
+          - adapt_dataloader
+        outputs:
+          - models/biot_ready.flag
+
+      - id: D3_S2
+        name: "Train BIOT from scratch"
+        actions:
+          - train_on_BCI_IV_2a
+          - log_tensorboard_metrics
+        outputs:
+          - logs/task2_biot/scratch/*
+
+      - id: D3_S3
+        name: "Fine-tune pretrained BIOT"
+        actions:
+          - load_pretrained_weights
+          - finetune_same_hyperparams
+          - log_tensorboard_metrics
+        outputs:
+          - logs/task2_biot/pretrained/*
+
+      - id: D3_S4
+        name: "Cross-dataset evaluation"
+        actions:
+          - finetune_on_dataset_A
+          - evaluate_on_dataset_B
+          - record_performance_drop
+        outputs:
+          - analysis/cross_dataset_results.txt
+
+  iter4:
+    goal: "Attention + slides"
+    steps:
+      - id: D4_S1
+        name: "Attention extraction"
+        actions:
+          - extract_attention_early_mid_late_layers
+          - average_heads_and_compute_variance
+          - generate_heatmaps
+        outputs:
+          - analysis/attention_maps.png
+
+      - id: D4_S2
+        name: "Interpretation notes"
+        actions:
+          - summarize_observations
+          - list_limitations_of_attention
+        outputs:
+          - analysis/attention_notes.txt
+
+      - id: D4_S3
+        name: "Slide assembly"
+        actions:
+          - create_5_slides_task1
+          - create_5_slides_task2
+          - create_5_slides_task3
+        constraints:
+          - minimal_text
+          - figures_over_tables
+        outputs:
+          - slides/final_deck.pdf
+
+failure_policy:
+  on_error:
+    - log_error
+    - explain_reason
+    - continue_pipeline
+
+final_validation:
+  checklist:
+    - tensorboard_logs_present
+    - cross_subject_evaluation_done
+    - tsne_gradients_attention_present
+    - pretrained_vs_scratch_compared
+    - no_data_leakage_detected

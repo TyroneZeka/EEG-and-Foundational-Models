@@ -1,0 +1,12 @@
+numpy
+scipy
+torch
+tensorboard
+mne
+moabb
+scikit-learn
+matplotlib
+seaborn
+pandas
+tqdm
+pytest

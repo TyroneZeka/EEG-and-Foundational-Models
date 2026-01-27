@@ -1,0 +1,37 @@
+Technical Assessment: EEG and Foundation Models 
+The field of physiological time-series analysis is rapidly evolving, moving from specialized, task-specific models (e.g., 1D-CNNs and LSTMs) toward large-scale foundation models. This assessment is designed to evaluate your ability to navigate this transition while demonstrating sound technical judgment and research thinking. 
+Deadline: Within two weeks (January 31, 2026, at 11:59 PM EST) 
+Delivery: Please prepare approximately five slides for each task. 
+Task 1: EEG Data Processing, Visualization, and Classical Neural Networks 
+Objective: 
+Establish a high-fidelity EEG data processing pipeline and demonstrate a deep understanding of EEG signal characteristics through classical deep learning models. 
+You will work with established EEG architectures such as EEGNet and ShallowConvNet (e.g., implementations similar to: 
+https://github.com/rkobler/TSMNet/blob/main/spdnets/models/shconvnet.py). 
+
+Requirements
+•	Reproduce the results of EEGNet or ShallowConvNet on any three datasets (see Table 5).
+•	Reproduce Figure 3.
+•	Use t-SNE to analyze data distributions at different stages: raw input, hidden feature representations, network outputs.
+•	Visualize gradients at the early, middle, and late stages of training.
+•	Mandatory: Use TensorBoard to report training, validation, and testing curves, including: loss, balanced performance metrics, any additional metrics you find informative.
+•	Evaluate performance under cross-X settings (e.g., cross-subject or cross-session) for each X.
+•	Optional: Include additional analyses such as confusion matrices or other diagnostic visualizations.
+
+Task 2: Transformer-based Foundation Model (BIOT) 
+Objective: 
+Reproduce the BIOT (Biosignal Transformer) model and demonstrate a deep understanding of foundation-model-style learning for EEG data, with particular emphasis on: 
+•	pretraining vs. training from scratch,
+•	cross-dataset generalization,
+•	interpretability via attention visualization.
+BIOT: Biosignal Transformer for Cross-data Learning in the Wild Official repository: https://github.com/ycq091044/BIOT
+Requirements
+•	Choose any two EEG datasets.
+•	Train BIOT under two settings:
+o	training from scratch,
+o	fine-tuning using pretrained BIOT weights.
+•	Mandatory: Use TensorBoard to log:
+o	training, validation, and testing loss,
+o	main performance metrics.
+•	Attention visualization:
+o	extract and visualize self-attention maps from BIOT,
+o	analyze attention patterns at early, middle, and late transformer layers.
