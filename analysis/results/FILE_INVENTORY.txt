@@ -1,0 +1,32 @@
+FILE INVENTORY
+================================================================================
+
+TRAINED MODELS
+--------------------------------------------------------------------------------
+Location: experiments/task1_eegnet/{dataset}/fold_{N}_best_model.pth
+Datasets: BCI_IV_2a (9 folds), BCI_IV_2b (9 folds), PhysioNet_MI (5 folds)
+
+VISUALIZATIONS
+--------------------------------------------------------------------------------
+Location: analysis/figures/{dataset}/
+Contents:
+  - spatial_filters.png: Topographic maps of learned spatial patterns
+  - temporal_filters.png: Spectral response of temporal filters
+  - class_specific_figure3.png: Per-class spatial/spectral analysis
+  - tsne_visualization.png: Feature space dimensionality reduction
+
+TENSORBOARD LOGS
+--------------------------------------------------------------------------------
+Location: logs/task1_eegnet_optimized/{dataset}/fold_{N}/
+View with: tensorboard --logdir logs/task1_eegnet_optimized
+Metrics: training loss, validation accuracy, learning rate
+
+SOURCE CODE
+--------------------------------------------------------------------------------
+models/eegnet.py - EEGNet neural network architecture
+data/load_data.py - Dataset loading and preprocessing
+model/train_eegnet_optimized.py - LOSO CV training pipeline
+analysis/visualize_weights.py - Spatial/temporal filter visualization
+analysis/class_specific_analysis.py - Class-specific feature analysis
+analysis/tsne_analysis.py - Feature space visualization
+

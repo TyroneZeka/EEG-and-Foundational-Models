@@ -1,0 +1,58 @@
+{
+  "BCI_IV_2a": {
+    "mean_accuracy": 0.4487,
+    "std_accuracy": 0.1533,
+    "min_accuracy": 0.2708,
+    "max_accuracy": 0.6649,
+    "per_fold": [
+      0.559,
+      0.2708,
+      0.5816,
+      0.3802,
+      0.283,
+      0.3281,
+      0.3212,
+      0.6649,
+      0.6493
+    ],
+    "n_subjects": 9,
+    "n_classes": 4,
+    "channels": 22
+  },
+  "BCI_IV_2b": {
+    "mean_accuracy": 0.6624,
+    "std_accuracy": 0.1024,
+    "min_accuracy": 0.4917,
+    "max_accuracy": 0.7806,
+    "per_fold": [
+      0.6694,
+      0.5265,
+      0.4917,
+      0.7689,
+      0.7122,
+      0.5639,
+      0.7514,
+      0.6974,
+      0.7806
+    ],
+    "n_subjects": 9,
+    "n_classes": 2,
+    "channels": 22
+  },
+  "PhysioNet_MI": {
+    "mean_accuracy": 0.3586,
+    "std_accuracy": 0.0141,
+    "min_accuracy": 0.3333,
+    "max_accuracy": 0.3752,
+    "per_fold": [
+      0.3752,
+      0.3556,
+      0.3636,
+      0.3333,
+      0.3651
+    ],
+    "n_subjects": 5,
+    "n_classes": 3,
+    "channels": 64
+  }
+}

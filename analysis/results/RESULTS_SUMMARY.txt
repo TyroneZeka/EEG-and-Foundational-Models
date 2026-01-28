@@ -1,0 +1,129 @@
+================================================================================
+EEG MOTOR IMAGERY CLASSIFICATION - RESULTS SUMMARY
+================================================================================
+Generated: 2026-01-28 21:24:30
+
+MODEL ARCHITECTURE
+--------------------------------------------------------------------------------
+Base Model: EEGNet (Compact CNN)
+Configuration: F1=16, F2=32, D=4 (Larger variant)
+Optimization: AdamW, CosineAnnealingWarmRestarts
+Training: LOSO Cross-Validation, 500 epochs
+Normalization: Per-fold z-score (fitted on train data only)
+Augmentation: Gaussian noise, temporal shift, time warp, mixup
+
+RESULTS BY DATASET
+--------------------------------------------------------------------------------
+
+BCI_IV_2a
+  Mean Balanced Accuracy: 0.4487 ± 0.1533
+  Range: [0.2708, 0.6649]
+  Subjects: 9, Classes: 4, Channels: 22
+  Per-fold accuracies:
+    Fold 1: 0.5590
+    Fold 2: 0.2708
+    Fold 3: 0.5816
+    Fold 4: 0.3802
+    Fold 5: 0.2830
+    Fold 6: 0.3281
+    Fold 7: 0.3212
+    Fold 8: 0.6649
+    Fold 9: 0.6493
+  Analysis:
+    - Variance (std): 0.1533
+    - Coefficient of Variation: 34.16%
+    - Best subject performance: 0.6649
+    - Worst subject performance: 0.2708
+
+BCI_IV_2b
+  Mean Balanced Accuracy: 0.6624 ± 0.1024
+  Range: [0.4917, 0.7806]
+  Subjects: 9, Classes: 2, Channels: 22
+  Per-fold accuracies:
+    Fold 1: 0.6694
+    Fold 2: 0.5265
+    Fold 3: 0.4917
+    Fold 4: 0.7689
+    Fold 5: 0.7122
+    Fold 6: 0.5639
+    Fold 7: 0.7514
+    Fold 8: 0.6974
+    Fold 9: 0.7806
+  Analysis:
+    - Variance (std): 0.1024
+    - Coefficient of Variation: 15.45%
+    - Best subject performance: 0.7806
+    - Worst subject performance: 0.4917
+
+PhysioNet_MI
+  Mean Balanced Accuracy: 0.3586 ± 0.0141
+  Range: [0.3333, 0.3752]
+  Subjects: 5, Classes: 3, Channels: 64
+  Per-fold accuracies:
+    Fold 1: 0.3752
+    Fold 2: 0.3556
+    Fold 3: 0.3636
+    Fold 4: 0.3333
+    Fold 5: 0.3651
+  Analysis:
+    - Variance (std): 0.0141
+    - Coefficient of Variation: 3.93%
+    - Best subject performance: 0.3752
+    - Worst subject performance: 0.3333
+
+KEY FINDINGS
+--------------------------------------------------------------------------------
+1. BCI_IV_2b Performance (66.24%):
+   - Strongest performance across all datasets
+   - Good stability (±10.24% std)
+   - 2-class problem is more tractable than 4-class
+
+2. BCI_IV_2a Performance (44.87%):
+   - Moderate overall performance
+   - High variance across subjects (±15.33% std)
+   - Suggests subject-specific patterns not fully captured
+   - 4-class problem is more difficult
+
+3. PhysioNet_MI Performance (35.86%):
+   - Lowest performance despite stable variation
+   - Very low overall accuracy
+   - 64 channels but small sample size
+   - Model may not be suitable for this multi-channel data
+
+VISUALIZATIONS GENERATED
+--------------------------------------------------------------------------------
+1. Spatial Filters (Topomaps)
+   - Shows learned spatial patterns across electrode positions
+   - Generated from depthwise convolutional layer weights
+
+2. Temporal Filters (Spectral Response)
+   - Shows frequency sensitivity of learned temporal filters
+   - Indicates which frequency bands (alpha, beta) are important
+
+3. Class-Specific Figure 3
+   - Per-class analysis of spatial and spectral importance
+   - Shows what distinguishes each motor imagery class
+
+4. t-SNE Visualizations
+   - 2D projections of learned feature representations
+   - Demonstrates how model separates classes in feature space
+
+INTERPRETATION
+--------------------------------------------------------------------------------
+The visualizations confirm that EEGNet learns neurophysiologically
+plausible patterns:
+
+- Spatial filters show concentration in sensorimotor cortex regions
+- Temporal filters emphasize alpha (8-12 Hz) and beta (13-30 Hz) bands
+- These align with known motor imagery EEG signatures
+
+However, low PhysioNet performance suggests architecture limitations
+with high-channel, small-sample datasets.
+
+RECOMMENDATIONS FOR IMPROVEMENT
+--------------------------------------------------------------------------------
+1. Architecture: Consider deeper or wider networks
+2. Subject-specific adaptation for BCI_IV_2a
+3. Specialized architecture for high-channel data (PhysioNet)
+4. Data augmentation tuning per dataset
+5. Transfer learning from BCI_IV_2b to other datasets
