@@ -10,7 +10,7 @@ import logging
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data.load_data import EEGDataLoader
+from data.load_data import DataLoader
 from data.preprocessing import preprocess_dataset
 from models.eegnet import EEGNet
 
@@ -23,7 +23,7 @@ def diagnose_data():
     logger.info("DATA QUALITY DIAGNOSTICS")
     logger.info("="*80)
     
-    loader = EEGDataLoader()
+    loader = DataLoader()
     data_2a = loader.load_bci_2a()
     
     X_raw = data_2a['X']

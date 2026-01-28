@@ -212,19 +212,13 @@ class InterpretabilityAnalyzer:
         """
         Generate topographic brain maps showing spatial filter importance.
         For each class, shows which brain regions are most important.
+        Uses fallback visualization if MNE topomap unavailable.
         """
         if self.n_channels == 22:
             channel_names = self.channel_names_22
         else:
             # For 64 channels, use standard names
             channel_names = [f'Ch{i}' for i in range(1, self.n_channels + 1)]
-        
-        # Create MNE info structure
-        try:
-            info = mne.create_info(ch_names=channel_names[:self.n_channels], sfreq=self.sampling_rate, ch_types='eeg')
-        except Exception as e:
-            logger.warning(f"Could not create MNE info: {e}")
-            return
         
         logger.info("Generating topographic maps...")
         
@@ -238,32 +232,45 @@ class InterpretabilityAnalyzer:
         if spatial_importance.max() > 0:
             spatial_importance = (spatial_importance - spatial_importance.min()) / (spatial_importance.max() - spatial_importance.min())
         
-        fig = plt.figure(figsize=(5*min(4, self.n_classes), 5))
+        fig = plt.figure(figsize=(5*min(4, self.n_classes), 6))
         
         class_names = self._get_class_names()
+        
+        # Try with MNE first
+        use_mne = True
+        try:
+            info = mne.create_info(ch_names=channel_names[:self.n_channels], sfreq=self.sampling_rate, ch_types='eeg')
+            info.set_montage(mne.channels.make_standard_montage('standard_1020') if self.n_channels <= 22 else None)
+        except Exception as e:
+            logger.info(f"MNE topomap unavailable ({type(e).__name__}), using fallback visualization")
+            use_mne = False
         
         for class_idx in range(min(4, self.n_classes)):
             ax = plt.subplot(1, min(4, self.n_classes), class_idx + 1)
             
-            try:
-                im, _ = plot_topomap(
-                    spatial_importance, 
-                    info,
-                    axes=ax,
-                    show=False,
-                    cmap='RdBu_r',
-                    vmin=-np.max(np.abs(spatial_importance)),
-                    vmax=np.max(np.abs(spatial_importance))
-                )
-                ax.set_title(f'{class_names[class_idx]}', fontsize=11, fontweight='bold')
-            except Exception as e:
-                logger.debug(f"Could not generate topomap: {e}")
-                ax.text(0.5, 0.5, 'Topomap\nUnavailable', ha='center', va='center', fontsize=10)
-                ax.set_xticks([])
-                ax.set_yticks([])
+            if use_mne:
+                try:
+                    im, _ = plot_topomap(
+                        spatial_importance, 
+                        info,
+                        axes=ax,
+                        show=False,
+                        cmap='RdBu_r',
+                        vmin=0,
+                        vmax=1.0,
+                        contours=False
+                    )
+                    ax.set_title(f'{class_names[class_idx]}', fontsize=11, fontweight='bold')
+                except Exception as e:
+                    logger.debug(f"MNE topomap failed for class {class_idx}: {e}")
+                    # Fallback: bar plot
+                    self._plot_channel_importance_fallback(ax, spatial_importance, class_names[class_idx])
+            else:
+                # Use fallback visualization
+                self._plot_channel_importance_fallback(ax, spatial_importance, class_names[class_idx])
         
         fold_str = f' - Fold {fold_idx}' if fold_idx is not None else ''
-        plt.suptitle(f'Spatial Filters - {self.dataset_name}{fold_str}', fontsize=14, fontweight='bold', y=1.02)
+        plt.suptitle(f'Spatial Filters (Channel Importance) - {self.dataset_name}{fold_str}', fontsize=14, fontweight='bold', y=1.00)
         plt.tight_layout()
         
         filename = f'topomaps_{self.dataset_name}' + (f'_fold{fold_idx}' if fold_idx else '') + '.png'
@@ -272,6 +279,27 @@ class InterpretabilityAnalyzer:
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
         logger.info(f"Saved topographic maps to {output_path}")
         plt.close()
+    
+    def _plot_channel_importance_fallback(self, ax, importance, title):
+        """Fallback visualization: bar plot of channel importance."""
+        if self.n_channels == 22:
+            channel_names = self.channel_names_22
+        else:
+            channel_names = [f'Ch{i}' for i in range(1, self.n_channels + 1)]
+        
+        # Show top channels
+        top_n = min(12, self.n_channels)
+        top_indices = np.argsort(importance)[-top_n:][::-1]
+        top_names = [channel_names[i] for i in top_indices]
+        top_values = importance[top_indices]
+        
+        colors = plt.cm.RdBu_r(top_values)
+        bars = ax.barh(top_names, top_values, color=colors, edgecolor='black', linewidth=0.5)
+        
+        ax.set_xlabel('Importance', fontsize=9)
+        ax.set_title(title, fontsize=11, fontweight='bold')
+        ax.set_xlim([0, 1.0])
+        ax.grid(True, axis='x', alpha=0.3, linestyle='--')
     
     def generate_spectral_plots(self, output_dir, fold_idx=None):
         """Generate spectral (frequency) response plots of temporal filters."""

@@ -225,98 +225,127 @@ class InterpretabilityAnalyzer:
         
         return freqs, fft_response
     
+    # Replace your existing function with this one
     def generate_topographic_maps(self, output_dir):
         """
-        Generate topographic brain maps showing spatial filter importance.
-        For each class, shows which brain regions are most important.
+        Generates topographic brain maps for individual spatial filters.
+        This shows the specific spatial patterns learned by the model.
         """
-        if self.n_channels == 22:
-            channel_names = self.channel_names_22
-        else:
-            channel_names = self.channel_names_64
-        
-        # Create MNE info structure
+        if self.n_channels not in [22, 64]:
+            logger.warning("Unsupported channel count for topomaps. Skipping.")
+            return
+
+        # Use the appropriate channel names and create MNE info
+        channel_names = self.channel_names_22 if self.n_channels == 22 else self.channel_names_64
         info = mne.create_info(ch_names=channel_names, sfreq=self.sampling_rate, ch_types='eeg')
-        
-        logger.info("Generating topographic maps...")
-        
-        # Use first layer weights as spatial importance
-        temporal_weights, spatial_weights = self.extract_spatial_filters()
-        
-        # Average temporal filters per channel
-        spatial_importance = np.mean(np.abs(spatial_weights), axis=(0, 2, 3))[:self.n_channels]
-        
-        # Normalize
-        spatial_importance = (spatial_importance - spatial_importance.min()) / (spatial_importance.max() - spatial_importance.min())
-        
-        fig, axes = plt.subplots(1, self.n_classes, figsize=(5*self.n_classes, 5))
-        if self.n_classes == 1:
-            axes = [axes]
-        
-        class_names = self._get_class_names()
-        
-        for class_idx, ax in enumerate(axes):
-            try:
-                # For now, use same spatial importance for all classes
-                # In a more advanced analysis, extract class-specific importance
+        # This is crucial for plotting on a head shape
+        info.set_montage('standard_1020', on_missing='ignore')
+
+        logger.info("Generating topographic maps for spatial filters...")
+
+        # --- THIS IS THE KEY CHANGE ---
+        # Extract the spatial filters from the depthwise convolution layer
+        # Shape: (F1 * D, 1, n_channels, 1)
+        _, spatial_weights = self.extract_spatial_filters()
+        # Let's visualize the first F1 filters. Squeeze to shape (F1*D, n_channels)
+        spatial_filters = spatial_weights.squeeze()
+
+        # Determine how many filters to plot (e.g., the first F1=16 filters)
+        n_filters_to_plot = self.model.F1 
+
+        # Setup the plot grid
+        n_cols = 4
+        n_rows = int(np.ceil(n_filters_to_plot / n_cols))
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows))
+
+        # Find the global min/max across all filters for consistent color scaling
+        v_max = np.max(np.abs(spatial_filters[:n_filters_to_plot]))
+        v_min = -v_max
+
+        for i, ax in enumerate(axes.flat):
+            if i < n_filters_to_plot:
+                # Get the pattern for the current filter
+                filter_pattern = spatial_filters[i]
+
+                # Plot the topomap for THIS filter
                 im, _ = plot_topomap(
-                    spatial_importance, 
+                    filter_pattern,
                     info,
                     axes=ax,
                     show=False,
-                    cmap='RdBu_r',
-                    vmin=-np.max(spatial_importance),
-                    vmax=np.max(spatial_importance)
+                    cmap='RdBu_r', # Red-Blue colormap for intensity
+                    vmin=v_min,    # Use symmetric min/max for a balanced colormap
+                    vmax=v_max
                 )
-                ax.set_title(f'Spatial Filters - {class_names[class_idx]}', fontsize=12)
-            except Exception as e:
-                logger.warning(f"Could not generate topomap: {e}")
-                ax.text(0.5, 0.5, f'Topomap Error\n{str(e)}', ha='center', va='center')
-        
-        plt.suptitle(f'Topographic Brain Maps - {self.dataset_name}', fontsize=14, fontweight='bold')
-        plt.tight_layout()
-        
+                ax.set_title(f'Filter {i+1}', fontsize=10)
+            else:
+                # Hide unused subplots
+                ax.axis('off')
+
+        # Add a single colorbar for the whole figure
+        cbar_ax = fig.add_axes([0.92, 0.2, 0.02, 0.6])
+        cbar = plt.colorbar(im, cax=cbar_ax)
+        cbar.set_label('Filter Weight Intensity')
+
+        plt.suptitle(f'Spatial Filters (First {n_filters_to_plot} of {len(spatial_filters)}) - {self.dataset_name}', fontsize=16, fontweight='bold')
+        fig.tight_layout(rect=[0, 0, 0.9, 0.95]) # Adjust layout to make space for colorbar and title
+
         output_path = os.path.join(output_dir, f'topomaps_{self.dataset_name}.png')
         os.makedirs(output_dir, exist_ok=True)
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=150)
         logger.info(f"Saved topographic maps to {output_path}")
         plt.close()
+
+
     
+    # Replace your existing function with this one
     def generate_spectral_plots(self, output_dir):
-        """Generate spectral (frequency) response plots of temporal filters."""
-        logger.info("Generating spectral plots...")
+        """
+        Generates spectral response plots for individual temporal filters.
+        """
+        logger.info("Generating spectral plots for temporal filters...")
         
-        freqs, fft_response = self.compute_spectral_response()
+        # Shape: (F1, 1, 1, kernel_length)
+        temporal_weights, _ = self.extract_spatial_filters()
+        # Squeeze to (F1, kernel_length)
+        temporal_kernels = temporal_weights.squeeze()
         
-        fig, axes = plt.subplots(1, 1, figsize=(10, 6))
+        kernel_length = temporal_kernels.shape[1]
         
-        axes.plot(freqs, fft_response, linewidth=2, color='steelblue')
-        axes.fill_between(freqs, fft_response, alpha=0.3, color='steelblue')
+        fig, ax = plt.subplots(1, 1, figsize=(12, 7))
         
-        # Mark important frequency bands
-        alpha_band = (8, 12)
-        beta_band = (13, 30)
-        gamma_band = (30, 50)
-        
-        axes.axvspan(*alpha_band, alpha=0.1, color='red', label='Alpha (8-12 Hz)')
-        axes.axvspan(*beta_band, alpha=0.1, color='green', label='Beta (13-30 Hz)')
-        axes.axvspan(*gamma_band, alpha=0.1, color='blue', label='Gamma (30-50 Hz)')
-        
-        axes.set_xlabel('Frequency (Hz)', fontsize=12)
-        axes.set_ylabel('Filter Response (Magnitude)', fontsize=12)
-        axes.set_title(f'Spectral Response of Temporal Filters - {self.dataset_name}', 
+        # --- THIS IS THE KEY CHANGE ---
+        # Compute and plot FFT for each individual kernel
+        for kernel in temporal_kernels:
+            freqs = np.fft.rfftfreq(kernel_length, 1/self.sampling_rate)
+            fft_response = np.abs(np.fft.rfft(kernel))
+            
+            # Plot each filter's response with low opacity to see the density
+            ax.plot(freqs, fft_response, linewidth=1.5, alpha=0.6)
+            
+        # --- The rest is for styling the plot ---
+        ax.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax.set_ylabel('Filter Response (Magnitude)', fontsize=12)
+        ax.set_title(f'Spectral Response of all {len(temporal_kernels)} Temporal Filters - {self.dataset_name}',
                       fontsize=14, fontweight='bold')
-        axes.legend(loc='best', fontsize=10)
-        axes.grid(True, alpha=0.3)
-        axes.set_xlim([0, 50])
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.set_xlim([0, 40]) # Focus on the most relevant EEG frequency range
+        ax.set_ylim(bottom=0)
         
+        # Add labels for common EEG bands for context
+        bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 12), 'Beta': (13, 30)}
+        for band, (low, high) in bands.items():
+            ax.axvspan(low, high, alpha=0.1, color=plt.cm.viridis((high-low)/30), label=f'{band} ({low}-{high} Hz)')
+        
+        ax.legend(loc='best', fontsize=10)
         plt.tight_layout()
         
         output_path = os.path.join(output_dir, f'spectral_{self.dataset_name}.png')
         os.makedirs(output_dir, exist_ok=True)
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=150)
         logger.info(f"Saved spectral plot to {output_path}")
         plt.close()
+    
     
     def _get_class_names(self):
         """Get class names for the dataset."""

@@ -196,9 +196,7 @@ class EEGNet(nn.Module):
 
 
 def create_eegnet(n_channels, n_classes, n_samples, **kwargs):
-    """Factory function to create EEGNet model."""
     return EEGNet(n_channels, n_classes, n_samples, **kwargs)
 
 
-# For shape calculation
 import numpy as np

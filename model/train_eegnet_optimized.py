@@ -318,15 +318,7 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
         X_test = X[test_mask]
         y_test = y[test_mask]
         
-        # Per-fold z-score normalization (fit only on train+val)
-        mean_val = np.mean(X_train_val, axis=(0, 2), keepdims=True)
-        std_val = np.std(X_train_val, axis=(0, 2), keepdims=True)
-        std_val[std_val == 0] = 1
-        
-        X_train_val = (X_train_val - mean_val) / std_val
-        X_test = (X_test - mean_val) / std_val
-        
-        # Train/val split (80/20)
+        # Train/val split FIRST (80/20) before normalization
         n_train_val = len(X_train_val)
         n_train = int(0.8 * n_train_val)
         indices = np.arange(n_train_val)
@@ -338,6 +330,16 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
         
         X_train, y_train = X_train_val[train_indices], y_train_val[train_indices]
         X_val, y_val = X_train_val[val_indices], y_train_val[val_indices]
+        
+        # STRICT: Fit normalization ONLY on training data, apply to all three sets
+        mean_train = np.mean(X_train, axis=(0, 2), keepdims=True)
+        std_train = np.std(X_train, axis=(0, 2), keepdims=True)
+        std_train[std_train == 0] = 1
+        
+        # Apply the SAME normalization to train, val, and test
+        X_train = (X_train - mean_train) / std_train
+        X_val = (X_val - mean_train) / std_train
+        X_test = (X_test - mean_train) / std_train
         
         # Create model
         n_channels = X.shape[1]
