@@ -69,43 +69,69 @@ class DataLoader:
         return self.datasets['BCI_IV_2b']
     
     def load_physionet_mi(self):
-        """Load PhysioNet MI dataset via MNE."""
-        logger.info("Loading PhysioNet MI (eegbci)...")
+        """Load PhysioNet MI dataset via MNE from multiple subjects."""
+        logger.info("Loading PhysioNet MI (eegbci) - Multiple Subjects...")
         
-        # Download PhysioNet MI data
-        runs = [4, 8, 12]  # Motor imagery runs
-        raw_fnames = eegbci.load_data(1, runs, update_path=True)
+        # Load multiple subjects (1-5) with motor imagery runs
+        subjects = list(range(1, 6))  # Load subjects 1-5
+        runs = [4, 8, 12]  # Motor imagery runs (left hand, right hand, feet)
         
         X_list = []
         y_list = []
         subject_list = []
         
-        for run_idx, fname in enumerate(raw_fnames):
-            raw = mne.io.read_raw_edf(fname, preload=False)
-            raw.load_data()
+        for subject_id in subjects:
+            logger.info(f"  Loading subject {subject_id}...")
+            try:
+                raw_fnames = eegbci.load_data(subject_id, runs, update_path=True)
+            except Exception as e:
+                logger.warning(f"Could not load subject {subject_id}: {e}, skipping...")
+                continue
             
-            # Pick EEG channels (exclude EOG and EMG)
-            picks = mne.pick_types(raw.info, eeg=True, exclude='bads')
-            raw_eeg = raw.pick(picks)
-            
-            # Get events
-            events = mne.events_from_annotations(raw)[0]
-            event_id = {'T0': 0, 'T1': 1, 'T2': 2}  # rest, left hand, right hand
-            
-            # Create epochs
-            epochs = mne.Epochs(
-                raw_eeg, 
-                events, 
-                event_id=event_id,
-                tmin=0, 
-                tmax=4,
-                baseline=None,
-                preload=True
-            )
-            
-            X_list.append(epochs.get_data())
-            y_list.append(epochs.events[:, 2])
-            subject_list.extend([1] * len(epochs))
+            for run_idx, fname in enumerate(raw_fnames):
+                try:
+                    raw = mne.io.read_raw_edf(fname, preload=False)
+                    raw.load_data()
+
+                    # Pick EEG channels (exclude EOG and EMG)
+                    picks = mne.pick_types(raw.info, eeg=True, exclude='bads')
+                    raw_eeg = raw.pick(picks)
+
+                    # Extract events and mapping from annotations
+                    events, ann_event_id = mne.events_from_annotations(raw)
+
+                    # Select motor-imagery annotations (commonly 'T0','T1','T2') if present
+                    desired_keys = [k for k in ann_event_id.keys() if k in ('T0', 'T1', 'T2')]
+                    if not desired_keys:
+                        # Fallback: use all annotation keys
+                        desired_event_id = ann_event_id
+                    else:
+                        desired_event_id = {k: ann_event_id[k] for k in desired_keys}
+
+                    # Create epochs using the selected event mapping
+                    epochs = mne.Epochs(
+                        raw_eeg,
+                        events,
+                        event_id=desired_event_id,
+                        tmin=0,
+                        tmax=4,
+                        baseline=None,
+                        preload=True,
+                    )
+
+                    # Get numeric event codes and remap to contiguous labels (0..C-1)
+                    codes = epochs.events[:, 2]
+                    unique_codes = np.unique(codes)
+                    code2label = {code: idx for idx, code in enumerate(sorted(unique_codes))}
+                    labels = np.array([code2label[c] for c in codes], dtype=np.int64)
+
+                    X_list.append(epochs.get_data())
+                    y_list.append(labels)
+                    subject_list.extend([subject_id] * len(epochs))
+                
+                except Exception as e:
+                    logger.warning(f"Error processing run {run_idx} for subject {subject_id}: {e}")
+                    continue
         
         X = np.concatenate(X_list, axis=0)
         y = np.concatenate(y_list, axis=0)
@@ -161,12 +187,12 @@ class DataLoader:
                 f.write("\n")
         
         logger.info(f"Summary saved to {output_file}")
-    print(f"Window shape (Channels, Time samples): {window_shape_tuple}")
-    print(f"Sampling frequency: {sfreq} Hz")
-    print(f"Classes (integer labels): {targets}")
 
 
 if __name__ == "__main__":
     import warnings
     warnings.filterwarnings("ignore", message="Preprocessing choices with lambda functions cannot be saved.")
-    load_data_final()
+    # Simple demo: load all datasets and write summary
+    loader = DataLoader()
+    loader.load_all()
+    loader.save_summary()

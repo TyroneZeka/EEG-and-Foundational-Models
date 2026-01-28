@@ -21,7 +21,7 @@ sys.path.insert(0, project_root)
 
 from models.eegnet import EEGNet
 from data.load_data import DataLoader as EEGDataLoader
-from data.preprocessing import preprocess_dataset
+from data.preprocessing import preprocess_dataset, EEGPreprocessor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,7 +54,8 @@ class EEGNetTrainer:
         self.random_seed = random_seed
         
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(model.parameters(), lr=lr)
+        self.optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=epochs)
         
         np.random.seed(random_seed)
         torch.manual_seed(random_seed)
@@ -73,6 +74,7 @@ class EEGNetTrainer:
             logits = self.model(X)
             loss = self.criterion(logits, y)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             
             total_loss += loss.item()
@@ -138,6 +140,8 @@ class EEGNetTrainer:
         best_val_acc = 0
         best_model_state = None
         results = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
+        patience = 20
+        patience_counter = 0
         
         logger.info(f"Starting training for {self.epochs} epochs...")
         
@@ -150,13 +154,22 @@ class EEGNetTrainer:
             results['val_loss'].append(val_loss)
             results['val_acc'].append(val_acc)
             
+            self.scheduler.step()
+            
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 best_model_state = self.model.state_dict().copy()
+                patience_counter = 0
                 logger.info(f"Epoch {epoch+1}: New best validation accuracy: {val_acc:.4f}")
+            else:
+                patience_counter += 1
             
             if (epoch + 1) % 10 == 0:
                 logger.info(f"Epoch {epoch+1}: Train Loss={train_loss:.4f}, Val Loss={val_loss:.4f}, Val Acc={val_acc:.4f}")
+            
+            if patience_counter >= patience:
+                logger.info(f"Early stopping at epoch {epoch+1}")
+                break
         
         # Test evaluation
         if test_loader:
@@ -181,7 +194,7 @@ def loso_cross_validation(X, y, metadata, dataset_name='BCI_IV_2a', log_dir='log
     Leave-One-Subject-Out cross-validation.
     
     Args:
-        X: Data (n_samples, n_channels, n_times)
+        X: Data (n_samples, n_channels, n_times) - PREPROCESSED
         y: Labels (n_samples,)
         metadata: Metadata with 'subject' column
         dataset_name: Name of dataset
@@ -196,6 +209,9 @@ def loso_cross_validation(X, y, metadata, dataset_name='BCI_IV_2a', log_dir='log
     logger.info(f"Starting LOSO cross-validation on {dataset_name}...")
     logger.info(f"Number of subjects: {len(subjects)}")
     
+    # Preprocessor for within-fold normalization
+    preprocessor = EEGPreprocessor(sampling_rate=250)
+    
     for fold_idx, test_subject in enumerate(subjects):
         logger.info(f"\n{'='*80}")
         logger.info(f"Fold {fold_idx+1}/{len(subjects)}: Test Subject = {test_subject}")
@@ -209,6 +225,21 @@ def loso_cross_validation(X, y, metadata, dataset_name='BCI_IV_2a', log_dir='log
         y_train_val = y[train_val_mask]
         X_test = X[test_mask]
         y_test = y[test_mask]
+        
+        # Apply z-score normalization WITHIN fold (fit on train+val only)
+        # This prevents test data leakage into normalization statistics
+        from scipy import signal
+        
+        # Apply bandpass filter to this fold (already done globally, but re-apply for safety)
+        # and z-score normalize using ONLY train+val statistics
+        mean_val = np.mean(X_train_val, axis=(0, 2), keepdims=True)
+        std_val = np.std(X_train_val, axis=(0, 2), keepdims=True)
+        std_val[std_val == 0] = 1
+        
+        X_train_val = (X_train_val - mean_val) / std_val
+        X_test = (X_test - mean_val) / std_val
+        
+        logger.info(f"Applied within-fold z-score normalization (fit on train+val only)")
         
         # Further split train+val into train and val (80-20)
         n_train_val = len(X_train_val)
@@ -255,13 +286,24 @@ def loso_cross_validation(X, y, metadata, dataset_name='BCI_IV_2a', log_dir='log
 
 
 if __name__ == "__main__":
-    # Load and preprocess data
+    # Load data
     logger.info("Loading datasets...")
     loader = EEGDataLoader()
     
     # Load BCI_IV_2a
     data_2a = loader.load_bci_2a()
-    data_2a = preprocess_dataset(data_2a, sampling_rate=250)
+    
+    # Apply initial preprocessing (average reference, bandpass) 
+    # Z-score normalization will be done per-fold to prevent test leakage
+    preprocessor = EEGPreprocessor(sampling_rate=250)
+    X_processed = preprocessor.apply_average_reference(data_2a['X'])
+    X_processed = preprocessor.apply_bandpass_filter(X_processed)
+    data_2a['X'] = X_processed
+    # Convert labels to int (if they're strings from MOABB)
+    if data_2a['y'].dtype.kind in ('U', 'S', 'O'):
+        unique_labels = np.unique(data_2a['y'])
+        label_map = {label: idx for idx, label in enumerate(unique_labels)}
+        data_2a['y'] = np.array([label_map[label] for label in data_2a['y']], dtype=np.int64)
     
     # Run LOSO CV
     fold_results = loso_cross_validation(
@@ -278,55 +320,4 @@ if __name__ == "__main__":
     logger.info("="*80)
     test_accs = [r['test_balanced_acc'] for r in fold_results]
     logger.info(f"Mean Balanced Accuracy: {np.mean(test_accs):.4f} +/- {np.std(test_accs):.4f}")
-    logger.info(f"Per-fold accuracies: {[f'{acc:.4f}' for acc in test_accs]}") 
-    windows_dataset = create_windows_from_events(
-        dataset,
-        trial_start_offset_samples=0,
-        trial_stop_offset_samples=0,
-        window_size_samples=400, # 4 seconds * 100 Hz
-        window_stride_samples=400,
-        preload=True,
-    )
-
-    # 4. Splitting the data by subject for cross-subject validation
-    # We'll use subject 9 for validation and the 1-8 for training
-    subject_split = windows_dataset.split('subject')
-    train_set = [d for s, d in subject_split.items() if s != '9']
-    valid_set = subject_split['9']
-
-    # 5. Set up the EEGNet Model
-    n_channels = train_set[0][0][0].shape[0]
-    n_classes = len(train_set[0].metadata['target'].unique())
-    model = EEGNetv4(in_chans=n_channels, n_classes=n_classes, final_conv_length='auto')
-
-    # 6. Set up the Skorch trainer (EEGClassifier)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"Using device: {device}")
-
-    # Define callbacks for TensorBoard and learning rate scheduling
-    callbacks = [
-        ("lr_scheduler", LRScheduler('CosineAnnealingLR', T_max=10)),
-        ("tensorboard", TensorBoard(logdir="runs/eegnet_bnci")),
-    ]
-
-    clf = EEGClassifier(
-        model,
-        criterion=torch.nn.CrossEntropyLoss,
-        optimizer=torch.optim.AdamW,
-        optimizer__lr=0.001,
-        batch_size=64,
-        max_epochs=15, # A small number of epochs to start with
-        train_split=None, # We provide the validation set manually
-        callbacks=callbacks,
-        device=device,
-    )
-
-    # 7. Start Training
-    print("--- Starting Model Training ---")
-    clf.fit(train_set, y=None, X_val=valid_set, y_val=None)
-    print("--- Model Training Finished ---")
-
-if __name__ == "__main__":
-    import warnings
-    warnings.filterwarnings("ignore", message="Preprocessing choices with lambda functions cannot be saved.")
-    train_eegnet_cross_subject()
+    logger.info(f"Per-fold accuracies: {[f'{acc:.4f}' for acc in test_accs]}")
