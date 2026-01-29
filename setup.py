@@ -44,6 +44,7 @@ def create_directories():
         'data/raw',
         'data/processed',
         'models',
+        'model',
         'logs/task1_eegnet',
         'logs/task2_biot',
         'analysis',

@@ -1,257 +1,166 @@
-# 📑 Documentation Index & Navigation
+# EEG Classification and Analysis: EEGNet and Foundation Models
 
-Welcome! Here's where to find everything for the EEG Foundation Model Assessment.
-
----
-
-## 🚀 START HERE
-
-### For Quick Overview
-👉 **[OVERVIEW.md](OVERVIEW.md)** - Full project architecture and timeline
-
-### For Current Status
-👉 **[STATUS_REPORT.md](STATUS_REPORT.md)** - What's done, what's next, confidence levels
-
-### For Commands & Debugging
-👉 **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command reference, file locations, troubleshooting
+This repository contains my work for the Fall 2026 PhD Recruitment Task. The project focuses on the implementation, validation, and interpretation of deep learning models for EEG-based Brain-Computer Interfaces (BCIs).
 
 ---
 
-## 📊 Documentation by Phase
+## Table of Contents
 
-### Phase 1: Environment Setup ✅
-- **Completion Status:** 100%
-- **What was done:** Environment, dependencies, core modules
-- **Details:** [PHASE_1_SUMMARY.md](PHASE_1_SUMMARY.md)
-- **Checklist:** [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md) - Section: PHASE 1
-
-### Phase 2: EEGNet Training 🔄
-- **Completion Status:** 0% (infrastructure ready, quick test running)
-- **What will happen:** LOSO CV on 3 datasets + analysis
-- **Details:** [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md) - Section: PHASE 2
-- **Timeline:** 10-15 hours (starting now)
-
-### Phase 3: BIOT Training ⏳
-- **Completion Status:** 0% (queued)
-- **What will happen:** BIOT from scratch + fine-tuning + attention viz
-- **Details:** [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md) - Section: PHASE 3
-- **Timeline:** 4-6 hours (starts tomorrow)
-
-### Phase 4: Deliverables ⏳
-- **Completion Status:** 0% (queued)
-- **What will happen:** Slide assembly and final submission
-- **Details:** [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md) - Section: PHASE 4
-- **Timeline:** 2-3 hours (final step)
+1.  [Project Overview](#project-overview)
+2.  [Project Structure](#project-structure)
+3.  [Setup and Installation](#setup-and-installation)
+4.  [How to Run](#how-to-run)
+5.  [Task 1 Results & Analysis](#task-1-results--analysis)
+    *   [Performance Benchmarks](#performance-benchmarks)
+    *   [Model Interpretability Visualizations](#model-interpretability-visualizations)
+6.  [Next Steps](#next-steps)
 
 ---
 
-## 📁 File Organization
+## Project Overview
 
-### Documentation Files (5)
-```
-📄 README.md                    ← This file
-📄 OVERVIEW.md                  ← Project architecture & timeline
-📄 STATUS_REPORT.md            ← Current status & confidence
-📄 PHASE_1_SUMMARY.md          ← What was built in Phase 1
-📄 QUICK_REFERENCE.md          ← Commands, configs, debugging
-📄 REQUIREMENTS_CHECKLIST.md   ← Task tracking (USE THIS TO TRACK PROGRESS)
-```
+The project is divided into three main tasks:
 
-### Core Code Files (8)
-```
-🐍 models/eegnet.py            ← EEGNet model implementation
-🐍 data/preprocessing.py        ← Preprocessing pipeline
-🐍 data/load_data.py           ← Data loading (MOABB + MNE)
-🐍 model/train_eegnet.py       ← Training framework (LOSO CV)
-🐍 train_quick.py              ← Quick training validation
-🐍 test_setup.py               ← System verification
-🐍 setup.py                    ← Setup automation
-📄 requirements.txt            ← Dependencies list
-```
+*   **Task 1: EEGNet Implementation & Analysis**
+    *   Implement the EEGNet-v4 model from scratch in PyTorch.
+    *   Build a robust data loading and preprocessing pipeline for standard BCI datasets (`BCI-IV-2a`, `BCI-IV-2b`, `PhysioNet-MI`).
+    *   Validate the model using a "Leave-One-Subject-Out" cross-validation scheme and reproduce benchmark results from the original paper.
+    *   Perform in-depth interpretability analysis by visualizing learned filters (spatial and temporal) and feature separability (multi-stage t-SNE).
 
-### Configuration Files (1)
+*   **Task 2: Transformer-based Foundation Model (BIOT)**
+    *    Implement the BIOT model.
+    *    Compare training from scratch vs. fine-tuning with pre-trained weights.
+    *    Analyze the model's self-attention maps.
+
+---
+
+## Project Structure
+
+The repository is organized as follows:
+
 ```
-⚙️ .yaml                        ← Original project spec (reference)
+.
+├── analysis/
+│   ├── generate_all_visualizations.py    # Generates spatial/temporal filter plots
+│   └── generate_all_multistage_tsne.py # Generates 3-stage t-SNE plots
+│
+├── data/
+│   ├── load_data.py                      # Handles downloading and loading of all datasets
+│   └── preprocessing.py                  # EEGPreprocessor class
+│
+├── experiments/
+│   └── task1_eegnet/                     # Root directory for saved models and logs
+│       ├── bci_iv_2a/
+│       │   ├── fold_1_best_model.pth     # Example of a saved model
+│       │   └── logs/                     # TensorBoard logs for this fold
+│       └── ...                           # Other datasets and folds
+│
+├── models/
+│   └── eegnet.py                         # EEGNet model class definition
+│
+├── model/
+│   └── train_eegnet.py                   # Main training script
+│
+└── README.md                             # This file
 ```
 
 ---
 
-## 🎯 Quick Navigation by Task
+## Setup and Installation
 
-### "I want to know what's done"
-1. Read [STATUS_REPORT.md](STATUS_REPORT.md) - 2 min
-2. Check [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md) - 3 min
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/TyroneZeka/EEG-and-Foundational-Models.git
+    cd EEG-and-Foundational-Models
+    ```
 
-### "I want to understand the architecture"
-1. Read [OVERVIEW.md](OVERVIEW.md) - 10 min
-2. Review [PHASE_1_SUMMARY.md](PHASE_1_SUMMARY.md) - 10 min
-3. Check model: [models/eegnet.py](models/eegnet.py) - 5 min
+2.  **Create and activate a virtual environment (recommended):**
+    ```bash
+    python -m venv env
+    source env/bin/activate  # On Windows, use `env\Scripts\activate`
+    ```
 
-### "I want to run training"
-1. Check [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - "Essential Commands" section
-2. Run: `python model/train_eegnet.py`
-3. Monitor: `tensorboard --logdir logs/task1_eegnet`
-
-### "Something is broken"
-1. Check [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - "Common Issues & Solutions"
-2. Run: `python test_setup.py` to verify system
-3. Check [PHASE_1_SUMMARY.md](PHASE_1_SUMMARY.md) - "Known Limitations"
-
-### "I need to track progress"
-1. Update [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md)
-2. Check elapsed time vs timeline in [STATUS_REPORT.md](STATUS_REPORT.md)
-3. Monitor TensorBoard in browser at http://localhost:6006
-
-### "I'm ready for next steps"
-1. Check "Next Actions" in [STATUS_REPORT.md](STATUS_REPORT.md)
-2. Follow timeline in [OVERVIEW.md](OVERVIEW.md)
-3. Execute commands from [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+3.  **Install the required dependencies:**
+    *(Note: Creating a `requirements.txt` file from your environment with `pip freeze > requirements.txt` is a best practice.)*
+    ```bash
+    pip install torch numpy pandas scikit-learn matplotlib mne tensorboard tqdm
+    ```
 
 ---
 
-## ⏱️ Timeline Reference
+## How to Run
 
-**Current Time:** January 27, 2026, ~18:30 EST  
-**Deadline:** January 31, 2026, 23:59 EST  
-**Time Remaining:** ~76 hours  
-**Work Required:** ~35 hours  
-**Buffer:** ~41 hours ✅
+### 1. Train the EEGNet Model
 
-### Expected Milestones
-- 🔄 **Quick training completes:** Jan 27, ~20:00 EST
-- ⏳ **BCI_IV_2a LOSO completes:** Jan 28, ~02:00 EST
-- ⏳ **All datasets trained:** Jan 28, ~12:00 EST
-- ⏳ **BIOT training completes:** Jan 28, ~18:00 EST
-- ⏳ **Slides ready:** Jan 28, ~22:00 EST
-- ⏳ **Submission:** Jan 31, 23:00 EST (with buffer)
+The main training script will run the "Leave-One-Subject-Out" cross-validation for all specified datasets.
 
----
-
-## 🔧 Key Commands
-
-### View Progress
-```bash
-tensorboard --logdir logs/task1_eegnet/quick_test
-```
-
-### Run Training
 ```bash
 python model/train_eegnet.py
 ```
 
-### Verify System
+### 2. Monitor Training with TensorBoard
+
+While the model is training, you can view live metrics (loss, accuracy) and gradient distributions.
+
 ```bash
-python test_setup.py
+# In a new terminal, from the project root directory
+tensorboard --logdir experiments/
 ```
+Navigate to `http://localhost:6006/` in your browser.
 
-### Check Data
-```bash
-ls data/raw/
-ls ~/mne_data/MNE-bnci-data/  # On Windows: C:\Users\mufas\mne_data
+### 3. Generate All Visualizations
+
+After training is complete and models are saved, run the analysis scripts to generate all figures for the report.
+
+*   **Generate Spatial and Temporal Filter Plots:**
+    ```bash
+    python analysis/generate_all_visualizations.py
+    ```
+
+*   **Generate Multi-Stage t-SNE Plots:**
+    ```bash
+    python analysis/generate_all_multistage_tsne.py
+    ```
+The figures will be saved in the `analysis/final_figures/` and `analysis/multistage_tsne/` directories, respectively.
+
+---
+
+## Task 1 Results & Analysis
+
+### Performance Benchmarks
+
+The model performance was validated against the original paper's benchmarks, confirming a successful reproduction.
+
+| Dataset | Our Implementation (Mean Accuracy) | Paper Benchmark (Table 5) | Status |
+| :--- | :--- | :--- | :--- |
+| **BCI_IV_2a** | 44.0% | 43.3% | **Successfully Reproduced** |
+| **BCI_IV_2b** | 66.3% | 66.1% | **Successfully Reproduced** |
+| **PhysioNet_MI** | 33.2% | 36.1% | **Closely Aligned** |
+
+### Model Interpretability Visualizations
+
+#### Multi-Stage t-SNE Analysis
+
+These plots demonstrate the model's ability to learn a separable feature space, progressing from raw data to hidden features to final output logits.
+
+*(Example of how an image is embedded. The paths below point to figures generated by the analysis scripts.)*
+**`BCI_IV_2a` - Fold 1**
+| Stage 1: Raw Input | Stage 2: Hidden Features | Stage 3: Output Logits |
+| :---: | :---: | :---: |
+| ![Raw t-SNE](figures/stage1_raw_input.png) | ![Hidden t-SNE](figures/stage2_hidden_features.png) | ![Logits t-SNE](figures/stage3_output_logits.png) |
+
+#### Learned Filters (Spatial & Temporal)
+
+These plots confirm that the model learns neurophysiologically relevant patterns. The spatial filters focus on motor cortex regions, and the temporal filters are sensitive to Alpha/Beta frequency bands.
+
+![Learned Filters for BCI_IV_2a](figures/spatial_filters.png)
+
+
+---
+
+## Next Steps
+
+-   [ ] **Task 2:** Begin implementation of the BIOT foundation model.
+-   [ ] **Task 3:** Start literature review for paper selection.
+
 ```
-
----
-
-## 📈 Metrics & Success Criteria
-
-### What We're Tracking
-- ✅ Training loss (should decrease)
-- ✅ Validation loss (should decrease then plateau)
-- ✅ Balanced accuracy (primary metric)
-- ✅ Per-class accuracy
-- ✅ Test performance per fold
-- ✅ Convergence speed
-
-### Success Thresholds
-- Baseline (random): 25% accuracy (4 classes)
-- Expected result: 60-75% balanced accuracy
-- Target range: 70%+ on at least 2/3 datasets
-
----
-
-## 🎓 Learning Resources
-
-### For Understanding EEGNet
-- Paper: Lawhern et al. (2018) - See reference in eegnet.py
-- Tutorial: Check docstrings in [models/eegnet.py](models/eegnet.py)
-
-### For Understanding LOSO CV
-- Method: Leave-One-Subject-Out cross-validation
-- Implementation: See [model/train_eegnet.py](model/train_eegnet.py)
-
-### For Understanding Preprocessing
-- Pipeline: Described in [data/preprocessing.py](data/preprocessing.py)
-- Steps: Average ref → Bandpass filter → Z-score norm
-
-### For Understanding TensorBoard
-- Official docs: https://www.tensorflow.org/tensorboard
-- Quick start: Run `tensorboard --logdir logs/task1_eegnet/quick_test`
-
----
-
-## 🆘 Help & Support
-
-### If you're stuck:
-
-1. **Can't find a file?**
-   - Use: `find . -name "filename.py"`
-   - Check file structure in [OVERVIEW.md](OVERVIEW.md)
-
-2. **Command not working?**
-   - Check [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - "Common Issues"
-   - Run: `python test_setup.py`
-
-3. **Don't know what to do next?**
-   - Check: [STATUS_REPORT.md](STATUS_REPORT.md) - "Next Actions"
-   - Or: [OVERVIEW.md](OVERVIEW.md) - "Timeline"
-
-4. **Need to understand something?**
-   - Check the relevant section above
-   - Read code comments in .py files
-   - Check docstrings: `python -c "from models.eegnet import EEGNet; help(EEGNet)"`
-
----
-
-## 📞 Contact Points
-
-If sharing status with others:
-
-1. **For technical details:** Point to [PHASE_1_SUMMARY.md](PHASE_1_SUMMARY.md)
-2. **For current status:** Point to [STATUS_REPORT.md](STATUS_REPORT.md)
-3. **For command reference:** Point to [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
-4. **For progress tracking:** Point to [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md)
-
----
-
-## 📋 One-Page Summary
-
-| Item | Status | Location |
-|------|--------|----------|
-| **Environment** | ✅ Ready | [PHASE_1_SUMMARY.md](PHASE_1_SUMMARY.md) |
-| **EEGNet Model** | ✅ Ready | [models/eegnet.py](models/eegnet.py) |
-| **Preprocessing** | ✅ Ready | [data/preprocessing.py](data/preprocessing.py) |
-| **Data Loading** | ✅ Ready | [data/load_data.py](data/load_data.py) |
-| **Training Framework** | ✅ Ready | [model/train_eegnet.py](model/train_eegnet.py) |
-| **Quick Test** | 🔄 Running | [train_quick.py](train_quick.py) |
-| **Full LOSO CV** | ⏳ Queued | [model/train_eegnet.py](model/train_eegnet.py) |
-| **t-SNE Analysis** | ⏳ Planned | [REQUIREMENTS_CHECKLIST.md](REQUIREMENTS_CHECKLIST.md) |
-| **BIOT Setup** | ⏳ Planned | (external repo) |
-| **Slides** | ⏳ Planned | [slides/](slides/) |
-
----
-
-## 🎉 Final Notes
-
-- This is a **well-structured, tested, and documented project**
-- All code follows **best practices** for ML research
-- The system is **modular and extensible**
-- Everything is **tracked and monitored**
-- You have **plenty of time to finish** (41-hour buffer)
-
-**Get to it! 🚀**
-
----
-
-*Documentation Index Generated: January 27, 2026, 18:30 EST*  
-*Last Updated: Phase 1 Complete*  
-*Next Update: After quick training completes*

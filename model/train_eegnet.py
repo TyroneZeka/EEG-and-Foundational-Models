@@ -139,7 +139,7 @@ class AdvancedEEGNetTrainer:
         self.patience = 50
         self.patience_counter = 0
     
-    def train_epoch(self, train_loader, epoch):
+    def train_epoch(self, train_loader, epoch, writer):
         self.model.train()
         total_loss = 0
         all_preds = []
@@ -155,6 +155,7 @@ class AdvancedEEGNetTrainer:
             loss.backward()
             
             # Gradient clipping
+            self.log_gradients_to_tensorboard(writer, epoch)
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             
@@ -211,7 +212,7 @@ class AdvancedEEGNetTrainer:
                 X_train, y_train, batch_size=32, shuffle=True, augment=True, augment_prob=0.5
             )
             
-            train_loss, train_acc = self.train_epoch(train_loader, epoch)
+            train_loss, train_acc = self.train_epoch(train_loader, epoch, writer)
             
             # Validation (no augmentation)
             val_loader = DataLoader(
@@ -225,6 +226,7 @@ class AdvancedEEGNetTrainer:
             writer.add_scalar('val/loss', val_loss, epoch)
             writer.add_scalar('val/balanced_accuracy', val_acc, epoch)
             writer.add_scalar('learning_rate', self.optimizer.param_groups[0]['lr'], epoch)
+            
             
             self.scheduler.step()
             
@@ -261,6 +263,19 @@ class AdvancedEEGNetTrainer:
         
         writer.close()
         return best_model_state, results
+    
+    def log_gradients_to_tensorboard(self, writer, epoch):
+        """
+        Logs the distribution of gradients for all trainable parameters to TensorBoard.
+        """
+        # Use the model's named_parameters method to get both name and parameter
+        for name, param in self.model.named_parameters():
+            # Ensure the parameter has a gradient and it's not all zeros
+            if param.grad is not None and param.grad.nelement() > 0:
+                # The 'tag' is the name we'll see in TensorBoard, e.g., "gradients/conv1.weight"
+                tag = f"gradients/{name}"
+                # writer.add_histogram logs the distribution of values in the tensor
+                writer.add_histogram(tag, param.grad, epoch)
 
 
 def train_dataset_optimized(dataset_name, log_dir='logs'):
@@ -331,7 +346,7 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
         X_train, y_train = X_train_val[train_indices], y_train_val[train_indices]
         X_val, y_val = X_train_val[val_indices], y_train_val[val_indices]
         
-        # STRICT: Fit normalization ONLY on training data, apply to all three sets
+        
         mean_train = np.mean(X_train, axis=(0, 2), keepdims=True)
         std_train = np.std(X_train, axis=(0, 2), keepdims=True)
         std_train[std_train == 0] = 1
