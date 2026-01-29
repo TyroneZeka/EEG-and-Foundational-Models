@@ -51,8 +51,4 @@ ENV/
 .DS_Store
 Thumbs.db
 
-analysis/figures/*.png
-analysis/final_figures/*.png
-analysis/figure3_results/*.png
-analysis/multistage_tsne/*.png
-analysis/*/*/*/*.png
+analysis/**/*.png
