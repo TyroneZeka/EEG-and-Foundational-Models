@@ -10,3 +10,6 @@ seaborn
 pandas
 tqdm
 pytest
+linear_attention_transformer
+einops
+pytorch_lightning

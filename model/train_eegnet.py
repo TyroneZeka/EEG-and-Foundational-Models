@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-"""
-Advanced EEGNet trainer with data augmentation and optimized hyperparameters.
-Focus: Maximize accuracy over speed.
-"""
-
 import os
 import sys
 import numpy as np
@@ -28,11 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class EEGAugmentation:
-    """Data augmentation for EEG signals."""
     
     @staticmethod
     def temporal_shift(X, max_shift=10):
-        """Random temporal shift (circular)."""
+        """Randomly shift the signal in time."""
         batch_size = X.shape[0]
         n_samples = X.shape[2]
         shifted = np.zeros_like(X)
@@ -56,7 +49,6 @@ class EEGAugmentation:
         warped = np.zeros_like(X)
         
         for i in range(batch_size):
-            # Create warping factor that varies per sample
             warp_factor = 1 + np.random.randn() * warp_strength
             new_indices = np.linspace(0, n_samples - 1, n_samples) / warp_factor
             new_indices = np.clip(new_indices, 0, n_samples - 1)
@@ -78,13 +70,11 @@ class EEGAugmentation:
             lam = np.random.beta(alpha, alpha)
             idx1, idx2 = i, indices[i]
             X_mixed[idx1] = lam * X[idx1] + (1 - lam) * X[idx2]
-            # For classification, keep original labels (could use soft labels)
         
         return X_mixed, y_mixed
 
 
 class AugmentedEEGDataLoader:
-    """DataLoader with on-the-fly augmentation."""
     
     def __init__(self, X, y, batch_size=32, shuffle=True, augment=False, augment_prob=0.3):
         self.X = X
@@ -123,20 +113,20 @@ class AugmentedEEGDataLoader:
 class AdvancedEEGNetTrainer:
     """Advanced trainer with augmentation and optimized hyperparameters."""
     
-    def __init__(self, model, device='cpu', lr=0.0002, weight_decay=0.0002, epochs=500):
+    def __init__(self, model, device='cuda', lr=0.0002, weight_decay=0.0002, epochs=300):
         self.model = model.to(device)
         self.device = device
         
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-        # Cosine annealing with warm restarts (T_mult must be integer)
+        # Cosine annealing with warm restarts
         self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
             self.optimizer, T_0=50, T_mult=2, eta_min=1e-6
         )
         
         self.epochs = epochs
         self.best_val_acc = 0
-        self.patience = 50
+        self.patience = 20
         self.patience_counter = 0
     
     def train_epoch(self, train_loader, epoch, writer):
@@ -268,21 +258,17 @@ class AdvancedEEGNetTrainer:
         """
         Logs the distribution of gradients for all trainable parameters to TensorBoard.
         """
-        # Use the model's named_parameters method to get both name and parameter
         for name, param in self.model.named_parameters():
             # Ensure the parameter has a gradient and it's not all zeros
             if param.grad is not None and param.grad.nelement() > 0:
-                # The 'tag' is the name we'll see in TensorBoard, e.g., "gradients/conv1.weight"
                 tag = f"gradients/{name}"
-                # writer.add_histogram logs the distribution of values in the tensor
                 writer.add_histogram(tag, param.grad, epoch)
 
 
 def train_dataset_optimized(dataset_name, log_dir='logs'):
-    """Train dataset with optimized settings for maximum accuracy."""
     
     logger.info(f"\n{'='*80}")
-    logger.info(f"TRAINING ON {dataset_name} (OPTIMIZED FOR ACCURACY)")
+    logger.info(f"TRAINING ON {dataset_name}")
     logger.info(f"{'='*80}\n")
     
     # Load data
@@ -291,30 +277,27 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
     if dataset_name == 'BCI_IV_2a':
         data = loader.load_bci_2a()
         sampling_rate = 250
-    elif dataset_name == 'BCI_IV_2b':
-        data = loader.load_bci_2b()
-        sampling_rate = 250
-    elif dataset_name == 'PhysioNet_MI':
-        data = loader.load_physionet_mi()
+    elif dataset_name == 'Lee2019':
+        data = loader.load_lee2019()
+        sampling_rate = 500
+    elif dataset_name == 'BNCI2015_001':
+        data = loader.load_bnci2015_001()
         sampling_rate = data['sampling_rate']
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
     
     X, y, metadata = data['X'], data['y'], data['metadata']
     
-    # Preprocess (global filters)
     preprocessor = EEGPreprocessor(sampling_rate=sampling_rate)
     X = preprocessor.apply_average_reference(X)
     X = preprocessor.apply_bandpass_filter(X)
     
-    # Convert labels to int
     if y.dtype.kind in ('U', 'S', 'O'):
         unique_labels = np.unique(y)
         label_map = {label: idx for idx, label in enumerate(unique_labels)}
         y = np.array([label_map[label] for label in y], dtype=np.int64)
         logger.info(f"Label mapping: {label_map}")
     
-    # LOSO CV
     subjects = np.unique(metadata['subject'])
     fold_results = []
     
@@ -333,7 +316,6 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
         X_test = X[test_mask]
         y_test = y[test_mask]
         
-        # Train/val split FIRST (80/20) before normalization
         n_train_val = len(X_train_val)
         n_train = int(0.8 * n_train_val)
         indices = np.arange(n_train_val)
@@ -370,7 +352,7 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
             device=device, 
             lr=0.0002,
             weight_decay=0.0002,
-            epochs=500
+            epochs=300
         )
         
         fold_log_dir = os.path.join(log_dir, dataset_name.replace('_', ''), f'fold_{fold_idx+1}')
@@ -386,8 +368,6 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
         results['fold'] = fold_idx + 1
         results['subject'] = test_subject
         fold_results.append(results)
-        
-        # Run interpretability analysis on test set
         try:
             logger.info(f"\nRunning Figure 3 Analysis for Fold {fold_idx+1}...")
             model_for_analysis = EEGNet(n_channels, n_classes, n_samples, F1=16, F2=32, D=4)
@@ -423,9 +403,9 @@ def train_dataset_optimized(dataset_name, log_dir='logs'):
 
 if __name__ == "__main__":
     # Train all datasets with optimization focus
-    results_2a = train_dataset_optimized('BCI_IV_2a', log_dir='logs/task1_eegnet_optimized')
-    results_2b = train_dataset_optimized('BCI_IV_2b', log_dir='logs/task1_eegnet_optimized')
-    results_physionet = train_dataset_optimized('PhysioNet_MI', log_dir='logs/task1_eegnet_optimized')
+    # results_2a = train_dataset_optimized('BCI_IV_2a', log_dir='logs/task1_eegnet_optimized')
+    # results_2x15 = train_dataset_optimized('BNCI2015_001', log_dir='logs/task1_eegnet_optimized')
+    results_physionet = train_dataset_optimized('Lee2019', log_dir='logs/task1_eegnet_optimized')
     
     logger.info("\n" + "="*80)
     logger.info("ALL DATASETS TRAINING COMPLETE")

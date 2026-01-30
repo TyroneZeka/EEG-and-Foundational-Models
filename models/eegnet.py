@@ -1,8 +1,3 @@
-"""
-EEGNet implementation - Canonical architecture for EEG classification.
-Based on: Lawhern et al. (2018) "EEGNet: A Compact Convolutional Neural Network for EEG-based Brain-Computer Interfaces"
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,11 +5,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class EEGNet(nn.Module):
     """
     EEGNet: Compact CNN for EEG Classification.
-    
     Architecture:
     1. Initial temporal convolution (1, C) -> (F1, C)
     2. Spatial convolution (depthwise) (F1, 1) -> (F1, 1)
@@ -119,37 +112,23 @@ class EEGNet(nn.Module):
         return int(np.prod(x.shape[1:]))
     
     def forward(self, x):
-        """
-        Forward pass.
-        
-        Args:
-            x: (batch_size, n_channels, n_samples)
-        
-        Returns:
-            logits: (batch_size, n_classes)
-        """
-        # Add channel dimension: (batch, 1, channels, samples)
         x = x.unsqueeze(1)
-        
-        # Block 1: Temporal
+        # Temporal
         x = self.conv1(x)
         x = self.batchnorm1(x)
-        
-        # Block 2: Spatial (Depthwise)
+        # Spatial
         x = self.depthwise(x)
         x = self.batchnorm2(x)
         x = self.activation(x)
         x = self.pool1(x)
         x = self.dropout1(x)
-        
-        # Block 3: Depthwise Separable
+        #Depthwise Separable
         x = self.separable_depth(x)
         x = self.separable_point(x)
         x = self.batchnorm3(x)
         x = self.activation(x)
         x = self.pool2(x)
         x = self.dropout2(x)
-        
         # Flatten and classify
         x = x.view(x.size(0), -1)
         x = self.fc(x)

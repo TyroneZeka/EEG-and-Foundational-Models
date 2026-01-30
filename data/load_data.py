@@ -8,7 +8,9 @@ import pickle
 import numpy as np
 import mne
 from mne.datasets import eegbci
-from moabb.datasets import BNCI2014001, BNCI2014004
+import moabb
+from moabb.datasets import BNCI2014001,Lee2019_MI, BNCI2015_001
+from moabb.evaluations import WithinSessionEvaluation
 from moabb.paradigms import MotorImagery
 import logging
 
@@ -46,109 +48,51 @@ class DataLoader:
         }
         return self.datasets['BCI_IV_2a']
     
-    def load_bci_2b(self):
-        """Load BCI_IV_2b dataset via MOABB."""
-        logger.info("Loading BCI_IV_2b (BNCI2014004)...")
-        dataset = BNCI2014004()
-        
-        # Use MotorImagery paradigm to load data
+    
+    def load_lee2019(self):
+        """Load Lee2019 dataset via MOABB."""
+        logger.info("Loading Lee2019 MI dataset...")
+        dataset = Lee2019_MI()
         paradigm = MotorImagery(n_classes=2)
         X, y, metadata = paradigm.get_data(dataset=dataset)
-        
-        logger.info(f"BCI_IV_2b: X shape {X.shape}, y shape {y.shape}")
+
+        logger.info(f"Lee2019: X shape {X.shape}, y shape {y.shape}")
         logger.info(f"Classes: {np.unique(y)}, Subjects: {len(np.unique(metadata['subject']))}")
-        
-        self.datasets['BCI_IV_2b'] = {
+
+        self.datasets['Lee2019'] = {
+            'X': X, 'y': y, 'metadata': metadata,
+            'channels': X.shape[1],
+            'sampling_rate': 500,
+            'n_subjects': len(np.unique(metadata['subject']))
+        }
+        return self.datasets['Lee2019']
+
+    def load_bnci2015_001(self):
+        """Load BNCI2015-001 Motor Imagery dataset via MOABB."""
+        logger.info("Loading BNCI2015-001 MI dataset...")
+        dataset = BNCI2015_001()
+
+        # The dataset description says it's right hand vs. feet, which is a 2-class MI task
+        paradigm = MotorImagery(n_classes=2) 
+
+        # Use the paradigm to get the data. MOABB will handle the sessions correctly.
+        X, y, metadata = paradigm.get_data(dataset=dataset)
+        # --- END OF FIX ---
+
+        logger.info(f"BNCI2015-001: X shape {X.shape}, y shape {y.shape}")
+        logger.info(f"Classes: {np.unique(y)}, Subjects: {len(np.unique(metadata['subject']))}")
+
+        self.datasets['BNCI2015_001'] = {
             'X': X,
             'y': y,
             'metadata': metadata,
-            'channels': 3,
-            'sampling_rate': 250,
+            'channels': X.shape[1],
+            'sampling_rate': 512, # From the class description
             'n_subjects': len(np.unique(metadata['subject']))
         }
-        return self.datasets['BCI_IV_2b']
+        return self.datasets['BNCI2015_001']
     
-    def load_physionet_mi(self):
-        """Load PhysioNet MI dataset via MNE from multiple subjects."""
-        logger.info("Loading PhysioNet MI (eegbci) - Multiple Subjects...")
-        
-        # Load multiple subjects (1-5) with motor imagery runs
-        subjects = list(range(1, 6))  # Load subjects 1-5
-        runs = [4, 8, 12]  # Motor imagery runs (left hand, right hand, feet)
-        
-        X_list = []
-        y_list = []
-        subject_list = []
-        
-        for subject_id in subjects:
-            logger.info(f"  Loading subject {subject_id}...")
-            try:
-                raw_fnames = eegbci.load_data(subject_id, runs, update_path=True)
-            except Exception as e:
-                logger.warning(f"Could not load subject {subject_id}: {e}, skipping...")
-                continue
-            
-            for run_idx, fname in enumerate(raw_fnames):
-                try:
-                    raw = mne.io.read_raw_edf(fname, preload=False)
-                    raw.load_data()
 
-                    # Pick EEG channels (exclude EOG and EMG)
-                    picks = mne.pick_types(raw.info, eeg=True, exclude='bads')
-                    raw_eeg = raw.pick(picks)
-
-                    # Extract events and mapping from annotations
-                    events, ann_event_id = mne.events_from_annotations(raw)
-
-                    # Select motor-imagery annotations (commonly 'T0','T1','T2') if present
-                    desired_keys = [k for k in ann_event_id.keys() if k in ('T0', 'T1', 'T2')]
-                    if not desired_keys:
-                        # Fallback: use all annotation keys
-                        desired_event_id = ann_event_id
-                    else:
-                        desired_event_id = {k: ann_event_id[k] for k in desired_keys}
-
-                    # Create epochs using the selected event mapping
-                    epochs = mne.Epochs(
-                        raw_eeg,
-                        events,
-                        event_id=desired_event_id,
-                        tmin=0,
-                        tmax=4,
-                        baseline=None,
-                        preload=True,
-                    )
-
-                    # Get numeric event codes and remap to contiguous labels (0..C-1)
-                    codes = epochs.events[:, 2]
-                    unique_codes = np.unique(codes)
-                    code2label = {code: idx for idx, code in enumerate(sorted(unique_codes))}
-                    labels = np.array([code2label[c] for c in codes], dtype=np.int64)
-
-                    X_list.append(epochs.get_data())
-                    y_list.append(labels)
-                    subject_list.extend([subject_id] * len(epochs))
-                
-                except Exception as e:
-                    logger.warning(f"Error processing run {run_idx} for subject {subject_id}: {e}")
-                    continue
-        
-        X = np.concatenate(X_list, axis=0)
-        y = np.concatenate(y_list, axis=0)
-        
-        logger.info(f"PhysioNet MI: X shape {X.shape}, y shape {y.shape}")
-        logger.info(f"Classes: {np.unique(y)}")
-        
-        self.datasets['PhysioNet_MI'] = {
-            'X': X,
-            'y': y,
-            'metadata': {'subject': np.array(subject_list)},
-            'channels': X.shape[1],
-            'sampling_rate': 160,
-            'n_subjects': len(np.unique(subject_list))
-        }
-        return self.datasets['PhysioNet_MI']
-    
     def load_all(self):
         """Load all three datasets."""
         logger.info("Starting data loading for all datasets...")
